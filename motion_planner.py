@@ -46,6 +46,46 @@ class MotionPlanner:
 
         return np.array([x, y])
     
+    def line_is_free(self, grid, p1, p2):
+        x0, y0 = p1
+        x1, y1 = p2
+
+        n = int(max(abs(x1 - x0), abs(y1 - y0)))
+
+        for k in range(n + 1):
+            t = k / max(n, 1)
+            x = int(round(x0 + t * (x1 - x0)))
+            y = int(round(y0 + t * (y1 - y0)))
+
+            if not (0 <= x < grid.shape[1] and 0 <= y < grid.shape[0]):
+                return False
+
+            if grid[y, x] == 1:
+                return False
+
+        return True
+
+
+    def smooth_path(self, grid, path):
+        if len(path) <= 2:
+            return path
+
+        smoothed = [path[0]]
+        i = 0
+
+        while i < len(path) - 1:
+            j = len(path) - 1
+
+            while j > i + 1:
+                if self.line_is_free(grid, path[i], path[j]):
+                    break
+                j -= 1
+
+            smoothed.append(path[j])
+            i = j
+
+        return smoothed
+    
     def plan(self, start, goal):
         start_grid = self.world_to_grid(start)
         goal_grid = self.world_to_grid(goal)
@@ -53,6 +93,8 @@ class MotionPlanner:
         grid = self.define_grid()
 
         path_grid = self.aStarSearch(grid, start_grid, goal_grid)
+
+        path_grid = self.smooth_path(grid, path_grid)
 
         path_world = [self.grid_to_world(cell) for cell in path_grid]
 
