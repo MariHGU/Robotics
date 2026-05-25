@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import heapq
 
 class MotionPlanner:
-    def __init__(self, start, goal, obstacles: list , grid_size=10, resolution=0.1, obstacle_radius=0.5):
+    def __init__(self, start, goal, obstacles: list , grid_size=10, resolution=0.1, obstacle_radius=0.5, robot_radius=0.3):
         self.start = np.array(start)
         self.goal = np.array(goal)
         self.obstacles = obstacles 
@@ -14,6 +14,7 @@ class MotionPlanner:
 
         self.resolution = resolution
         self.obstacle_radius = obstacle_radius
+        self.robot_radius = robot_radius
 
     def define_grid(self):
         grid_width = int((self.x_max - self.x_min) / self.resolution)
@@ -66,7 +67,7 @@ class MotionPlanner:
             p2 = wall["p2"]
             wall_width = wall["wall_width"]
 
-            if np.linalg.norm(point - p1) <= self.obstacle_radius or np.linalg.norm(point - p2) <= self.obstacle_radius:
+            if np.linalg.norm(point - p1) <= self.obstacle_radius + self.robot_radius or np.linalg.norm(point - p2) <= self.obstacle_radius + self.robot_radius:
                 return True
 
             wall_vec = p2 - p1
@@ -83,7 +84,7 @@ class MotionPlanner:
                 closest_point = p1 + t * wall_vec
                 distance_to_wall = np.linalg.norm(point - closest_point)
 
-                if distance_to_wall <= wall_width / 2:
+                if distance_to_wall <= wall_width / 2 + self.robot_radius:
                     return True
 
         return False
