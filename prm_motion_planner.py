@@ -1,0 +1,179 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import heapq
+
+class MotionPlanner:
+    def __init__(self, start, goal, obstacles: list , grid_size=10, obstacle_radius=0.5, robot_radius=0.3):
+        self.start = np.array(start) # x, y, theta
+        self.goal = np.array(goal) # x, y, theta
+        self.obstacles = obstacles 
+
+        self.grid_size = grid_size
+        self.x_min, self.x_max = -grid_size/2, grid_size/2
+        self.y_min, self.y_max = -grid_size/2, grid_size/2
+
+        self.obstacle_radius = obstacle_radius
+        self.robot_radius = robot_radius
+
+    def sample_random_points(self, num_points):
+        points = []
+        attempts = 0
+        max_attempts = num_points * 10
+        while len(points) < num_points and attempts < max_attempts:
+            attempts += 1
+            x = np.random.uniform(self.x_min, self.x_max)
+            y = np.random.uniform(self.y_min, self.y_max)
+            if not self.is_collision(np.array([x, y])):
+                points.append((x, y))
+        return points
+
+    def line_is_free(self, p1, p2, num_checks=20):
+        q1 = np.array(p1[:2], dtype=float)
+        q2 = np.array(p2[:2], dtype=float)
+
+        for k in range(num_checks + 1):
+            t = k / num_checks
+            point = q1 + t * (q2 - q1) # Linear interpolation point
+            if self.is_collision(point):
+                return False
+        return True
+
+    def is_collision(self, point):
+        point = np.array(point[:2], dtype=float)
+
+        # Check wall obstacles
+        for wall in self.obstacles:
+            p1 = np.array(wall["p1"], dtype=float)
+            p2 = np.array(wall["p2"], dtype=float)
+            wall_width = wall["wall_width"]
+
+            # First check endpoints of wall
+            if np.linalg.norm(point - p1) <= self.obstacle_radius + self.robot_radius or np.linalg.norm(point - p2) <= self.obstacle_radius + self.robot_radius:
+                return True
+
+            wall_vec = p2 - p1
+            wall_length = np.linalg.norm(wall_vec)
+
+            if wall_length == 0:
+                continue
+
+            # Projection parameter along wall
+            t = np.dot(point - p1, wall_vec) / wall_length**2
+
+            # Only check points whose closest point lies inside the wall segment
+            if 0 <= t <= 1:
+                closest_point = p1 + t * wall_vec
+                distance_to_wall = np.linalg.norm(point - closest_point)
+
+                if distance_to_wall <= wall_width / 2 + self.robot_radius:
+                    return True
+
+        return False
+    
+    def simple_planner(self, start, goal, num_steps=20):
+        # straigt line planner (p. 384/404)
+        # Returns waypoints ignoring obstacles
+        start, goal = np.array(start[:2], dtype=float), np.array(goal[:2], dtype=float)
+        #num_steps = 20
+        for t in range(num_steps + 1):
+            path = start + (goal - start) * t / num_steps
+        #path = [start + (goal - start) * t / num_steps for t in range(num_steps + 1)]
+        return path
+    
+    def aStarSearch(self, start, edges, nodes, goal):
+        """Search the node that has the lowest combined cost and heuristic first."""
+        # Base from task 4, homework 4
+        # Astar: f(n) = g(n) + h(n) | g(n) = cost, h(n) = heuristic distance
+        frontier = []
+
+        heapq.heappush(frontier, (self.heuristic(start, goal, nodes), start))
+
+        prev_state = {}
+        path = []
+        best_g = {start: 0.0}
+        print(frontier)
+
+        while frontier:
+            _, state = heapq.heappop(frontier)
+
+            if state == goal:
+                print("Goal found")
+
+                path = [state]
+                while state in prev_state:
+                    state = prev_state[state]
+                    path.append(state)
+
+                path.reverse()
+                return path
+            
+            for v in edges.get(state, []):
+                new_g = best_g[state] + np.linalg.norm(nodes[state] - nodes[v]) # euclidean distance as cost
+
+                if new_g < best_g.get(v, float('inf')):
+                    best_g[v] = new_g
+                    h = self.heuristic(v, goal, nodes)
+                    f = new_g + h
+                    heapq.heappush(frontier, (f, v))
+                    prev_state[v] = state
+        return []
+
+    def heuristic(self, a, b, nodes):
+        """Euclidean distance"""
+        return np.linalg.norm((nodes[a] - nodes[b])) # euclidean
+
+    
+    def prm_roadmap(self, num_samples=100, k=5):
+        # Returns a roadmap
+        # N random samples, k nearest neighbours
+        
+        # Retrieve samples
+        samples = self.sample_random_points(num_samples)
+        samples.append(self.start[:2])
+        samples.append(self.goal[:2])
+
+        nodes = [np.array(sample, dtype=float) for sample in samples]
+        N = len(nodes)
+
+        edges = {}
+
+        # Connect neighbours
+        for i in range(N):
+            qi = nodes[i]
+
+            distances = []
+            for j in range(N):
+                if i != j:
+                    qj =  nodes[j]
+                    dist = np.linalg.norm(qi - qj)
+                    distances.append((dist, j))
+            distances.sort()
+
+            neighbours = [j for _, j in distances[:k]] # k nearest neighbours
+
+            for j in neighbours:
+                qj = nodes[j]
+                if self.line_is_free(qi, qj):
+                    edges.setdefault(i, []).append(j)
+                    edges.setdefault(j, []).append(i)
+        return nodes, edges
+    
+    def prm(self, N=100, k=5):
+        nodes, edges = self.prm_roadmap(N, k)
+
+        start_idx = len(nodes) - 2
+        goal_idx = len(nodes) - 1
+
+        # A* search on roadmap
+
+        # add astar here
+        path_indicies = self.aStarSearch(start_idx, edges, nodes, goal_idx)
+
+        if path_indicies is None:
+            print("No path found")
+            return []
+        
+        path = [nodes[i] for i in path_indicies]
+        return path
+
+
