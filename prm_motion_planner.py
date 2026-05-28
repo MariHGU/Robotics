@@ -8,12 +8,14 @@ class MotionPlanner:
         self.goal = np.array(goal) # x, y, theta
         self.obstacles = obstacles 
 
-        self.grid_size = grid_size
-        self.x_min, self.x_max = -grid_size/2, grid_size/2
-        self.y_min, self.y_max = -grid_size/2, grid_size/2
-
         self.obstacle_radius = obstacle_radius
         self.robot_radius = robot_radius
+
+        self.grid_size = grid_size
+        margin = robot_radius + obstacle_radius
+        self.x_min, self.x_max = -grid_size/2 + margin, grid_size/2 - margin
+        self.y_min, self.y_max = -grid_size/2 + margin, grid_size/2 - margin
+
 
     def sample_random_points(self, num_points):
         points = []
@@ -41,44 +43,42 @@ class MotionPlanner:
     def is_collision(self, point):
         point = np.array(point[:2], dtype=float)
 
-        # Check wall obstacles
         for wall in self.obstacles:
             p1 = np.array(wall["p1"], dtype=float)
             p2 = np.array(wall["p2"], dtype=float)
             wall_width = wall["wall_width"]
+            endpoint_radius = wall.get("endpoint_radius", wall_width / 2)
+            segment_clearance = wall_width / 2 + self.robot_radius
+            endpoint_clearance = endpoint_radius + self.robot_radius
 
-            # First check endpoints of wall
-            if np.linalg.norm(point - p1) <= self.obstacle_radius + self.robot_radius or np.linalg.norm(point - p2) <= self.obstacle_radius + self.robot_radius:
+            # Endpoint check — use same clearance as segment
+            if np.linalg.norm(point - p1) <= endpoint_clearance:
+                return True
+            if np.linalg.norm(point - p2) <= endpoint_clearance:
                 return True
 
             wall_vec = p2 - p1
             wall_length = np.linalg.norm(wall_vec)
-
-            if wall_length == 0:
+            if wall_length < 1e-6:
                 continue
 
-            # Projection parameter along wall
             t = np.dot(point - p1, wall_vec) / wall_length**2
-
-            # Only check points whose closest point lies inside the wall segment
             if 0 <= t <= 1:
                 closest_point = p1 + t * wall_vec
-                distance_to_wall = np.linalg.norm(point - closest_point)
-
-                if distance_to_wall <= wall_width / 2 + self.robot_radius:
+                if np.linalg.norm(point - closest_point) <= segment_clearance:
                     return True
 
         return False
     
-    def simple_planner(self, start, goal, num_steps=20):
-        # straigt line planner (p. 384/404)
-        # Returns waypoints ignoring obstacles
-        start, goal = np.array(start[:2], dtype=float), np.array(goal[:2], dtype=float)
-        #num_steps = 20
-        for t in range(num_steps + 1):
-            path = start + (goal - start) * t / num_steps
-        #path = [start + (goal - start) * t / num_steps for t in range(num_steps + 1)]
-        return path
+    # def simple_planner(self, start, goal, num_steps=20):
+    #     # straigt line planner (p. 384/404)
+    #     # Returns waypoints ignoring obstacles
+    #     start, goal = np.array(start[:2], dtype=float), np.array(goal[:2], dtype=float)
+    #     #num_steps = 20
+    #     for t in range(num_steps + 1):
+    #         path = start + (goal - start) * t / num_steps
+    #     #path = [start + (goal - start) * t / num_steps for t in range(num_steps + 1)]
+    #     return path
     
     def aStarSearch(self, start, edges, nodes, goal):
         """Search the node that has the lowest combined cost and heuristic first."""
