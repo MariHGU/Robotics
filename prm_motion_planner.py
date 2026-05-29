@@ -164,11 +164,14 @@ class MotionPlanner:
         # A* search on roadmap
         path_indicies = self.aStarSearch(start_idx, edges, nodes, goal_idx)
 
-        if path_indicies is None:
+        if not path_indicies:
             print("No path found")
             return []
         
         path = [nodes[i] for i in path_indicies]
+        path.pop()
+        goal_pose = np.array([self.goal[0], self.goal[1], self.goal[2]], dtype=float)
+        path.append(goal_pose)
         return path
 
 

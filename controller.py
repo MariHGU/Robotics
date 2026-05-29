@@ -38,6 +38,12 @@ class Controller:
 
         distance = np.hypot(q[0] - q_d[0], q[1] - q_d[1])
 
+        # Rotation to alighn with goal heading:
+        if v_d == 0.0 and distance < 0.3:
+            v = 0.0
+            w = np.clip(-self.K3 * phi_e, -2.5, 2.5)
+            return v, w
+
             # If reference has stopped but robot is far away, use go-to-goal fallback
         if v_d == 0.0 and distance > 0.3:
             dx, dy = q_d[0] - q[0], q_d[1] - q[1]
