@@ -29,13 +29,8 @@ class MotionPlanner:
                 points.append((x, y))
         return points
 
-    def line_is_free(self, p1, p2, num_checks=20):
-        q1 = np.array(p1[:2], dtype=float)
-        q2 = np.array(p2[:2], dtype=float)
-
-        for k in range(num_checks + 1):
-            t = k / num_checks
-            point = q1 + t * (q2 - q1) # Linear interpolation point
+    def path_is_free(self, path):
+        for point in path:
             if self.is_collision(point):
                 return False
         return True
@@ -70,15 +65,15 @@ class MotionPlanner:
 
         return False
     
-    # def simple_planner(self, start, goal, num_steps=20):
-    #     # straigt line planner (p. 384/404)
-    #     # Returns waypoints ignoring obstacles
-    #     start, goal = np.array(start[:2], dtype=float), np.array(goal[:2], dtype=float)
-    #     #num_steps = 20
-    #     for t in range(num_steps + 1):
-    #         path = start + (goal - start) * t / num_steps
-    #     #path = [start + (goal - start) * t / num_steps for t in range(num_steps + 1)]
-    #     return path
+    def local_planner(self, start, goal, num_steps=20):
+        start, goal = np.array(start[:2], dtype=float), np.array(goal[:2], dtype=float)
+
+        path = []
+        for k in range(num_steps + 1):
+            t = k/num_steps
+            point = start + (goal-start)*t
+            path.append(point)
+        return path
     
     def aStarSearch(self, start, edges, nodes, goal):
         """Search the node that has the lowest combined cost and heuristic first."""
@@ -153,20 +148,20 @@ class MotionPlanner:
 
             for j in neighbours:
                 qj = nodes[j]
-                if self.line_is_free(qi, qj):
+
+                local_path = self.local_planner(qi, qj, num_steps=20)
+                if self.path_is_free(local_path):
                     edges.setdefault(i, []).append(j)
                     edges.setdefault(j, []).append(i)
         return nodes, edges
     
-    def prm(self, N=100, k=5):
+    def global_planner(self, N=100, k=5):
         nodes, edges = self.prm_roadmap(N, k)
 
         start_idx = len(nodes) - 2
         goal_idx = len(nodes) - 1
 
         # A* search on roadmap
-
-        # add astar here
         path_indicies = self.aStarSearch(start_idx, edges, nodes, goal_idx)
 
         if path_indicies is None:
