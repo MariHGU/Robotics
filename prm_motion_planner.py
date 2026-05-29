@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import heapq
 
 class MotionPlanner:
-    def __init__(self, start, goal, obstacles: list , grid_size=10, obstacle_radius=0.5, robot_radius=0.3):
+    def __init__(self, start, goal, obstacles: list , grid_size=10, obstacle_radius=0.5, robot_radius=0.3, wheelbase=0.5, max_steer_deg=35):
         self.start = np.array(start) # x, y, theta
         self.goal = np.array(goal) # x, y, theta
         self.obstacles = obstacles 
@@ -15,6 +15,11 @@ class MotionPlanner:
         margin = robot_radius + obstacle_radius
         self.x_min, self.x_max = -grid_size/2 + margin, grid_size/2 - margin
         self.y_min, self.y_max = -grid_size/2 + margin, grid_size/2 - margin
+
+        # Car-like param:
+        self.wheelbase = wheelbase
+        self.max_steer = np.radians(max_steer_deg)
+        self.min_turn_radius = wheelbase/np.tan(self.max_steer)
 
 
     def sample_random_points(self, num_points):
@@ -65,8 +70,29 @@ class MotionPlanner:
 
         return False
     
+    def requried_radius(self, p1, p2, theta1):
+        d = np.linalg.norm(p2 - p1)
+        if d < 1e-6:
+            return np.inf
+        
+        # Angle from p1 to p2 in local frame
+        alpha = np.arctan2(p2[1] - p1[1], p2[0] - p1[0] - theta1) # ???
+        alpha = np.arctan2(np.sin(alpha), np.cos(alpha))
+
+        if abs(np.sin(alpha)) < 1e-6:
+            return np.inf
+        
+        return abs(d / (2 * np.sin(alpha)))
+    
     def local_planner(self, start, goal, num_steps=20):
         start, goal = np.array(start[:2], dtype=float), np.array(goal[:2], dtype=float)
+
+        seg = goal - start
+        theta = np.arctan2(seg[1], seg[0])
+
+        rad = self.requried_radius(start, goal, theta)
+        if rad < self.min_turn_radius:
+            return []
 
         path = []
         for k in range(num_steps + 1):

@@ -2,15 +2,26 @@ import numpy as np
 import math
 
 class Controller:
-    def __init__(self, K1, K2, K3):
+    def __init__(self, K1, K2, K3, wheelbase, max_steer_deg):
         self.K1 = K1
         self.K2 = K2
         self.K3 = K3
         self.integral_error = 0.0
         self.previous_error = 0.0
 
+        # Car-like
+        self.wheelbase = wheelbase
+        self.max_steer = np.radians(max_steer_deg)
+
+
     def wrap_to_pi(self, a):
         return np.arctan2(np.sin(a), np.cos(a))
+    
+    def to_steering_angle(self, v, omega):
+        if abs(v) < 1e-6:
+            return 0.0
+        delta = np.arctan2(omega * self.wheelbase, v)
+        return float(np.clip(delta, -self.max_steer, self.max_steer))
 
     def error_coordinates(self, q, q_d):
         dphi = q[2]-q_d[2]
@@ -73,4 +84,12 @@ class Controller:
         w = np.clip(w, -2.5, 2.5)
 
         return v, w
+    
+    def car_controller(self, q, q_d, v_d, w_d):
+        v, omega = self.non_lin_fb_controller(q, q_d, v_d, w_d)
+
+        v = np.clip(v, 0.0, 1.0) # No reverse for now, planner does not account for it
+
+        delta = self.to_steering_angle(v, omega)
+        return v, delta
 
