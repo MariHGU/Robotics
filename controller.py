@@ -23,12 +23,12 @@ class Controller:
         delta = np.arctan2(omega * self.wheelbase, v)
         return float(np.clip(delta, -self.max_steer, self.max_steer))
 
-    def error_coordinates(self, q, q_d):
-        dphi = q[2]-q_d[2]
+    def error_coordinates(self, q_est, q_d):
+        dphi = q_est[2]-q_d[2]
         #print(dphi)
         phi_e = self.wrap_to_pi(dphi)
-        dx = q[0] - q_d[0]
-        dy = q[1] - q_d[1]
+        dx = q_est[0] - q_d[0]
+        dy = q_est[1] - q_d[1]
 
 
         x_e = math.cos(q_d[2])*dx + math.sin(q_d[2])*dy
@@ -44,10 +44,10 @@ class Controller:
 
 
     # Non lin FB controller + fb control law:
-    def non_lin_fb_controller(self, q, q_d, v_d, w_d):
-        x_e, y_e, phi_e = self.error_coordinates(q, q_d)
+    def non_lin_fb_controller(self, q_est, q_d, v_d, w_d):
+        x_e, y_e, phi_e = self.error_coordinates(q_est, q_d)
 
-        distance = np.hypot(q[0] - q_d[0], q[1] - q_d[1])
+        distance = np.hypot(q_est[0] - q_d[0], q_est[1] - q_d[1])
 
         # Rotation to alighn with goal heading:
         if v_d == 0.0 and distance < 0.3:
@@ -55,10 +55,10 @@ class Controller:
             w = np.clip(-self.K3 * phi_e, -2.5, 2.5)
             return v, w
 
-            # If reference has stopped but robot is far away, use go-to-goal fallback
+        # If reference has stopped but robot is far away, use go-to-goal fallback
         if v_d == 0.0 and distance > 0.3:
-            dx, dy = q_d[0] - q[0], q_d[1] - q[1]
-            heading_error = self.wrap_to_pi(np.arctan2(dy, dx) - q[2])
+            dx, dy = q_d[0] - q_est[0], q_d[1] - q_est[1]
+            heading_error = self.wrap_to_pi(np.arctan2(dy, dx) - q_est[2])
             v = self.K1 * distance * max(0.0, np.cos(heading_error))
             w = self.K3 * heading_error
             return np.clip(v, 0.0, 1.0), np.clip(w, -2.5, 2.5)
@@ -85,8 +85,8 @@ class Controller:
 
         return v, w
     
-    def car_controller(self, q, q_d, v_d, w_d):
-        v, omega = self.non_lin_fb_controller(q, q_d, v_d, w_d)
+    def car_controller(self, q_est, q_d, v_d, w_d):
+        v, omega = self.non_lin_fb_controller(q_est, q_d, v_d, w_d)
 
         v = np.clip(v, 0.0, 1.0) # No reverse for now, planner does not account for it
 

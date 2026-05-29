@@ -150,8 +150,9 @@ class MotionPlanner:
         
         # Retrieve samples
         samples = self.sample_random_points(num_samples)
-        samples.append(self.start[:2])
-        samples.append(self.goal[:2])
+        #samples.append(self.start[:2])
+        samples.append(tuple(self.start[:2]))
+        samples.append(tuple(self.goal[:2]))
 
         nodes = [np.array(sample, dtype=float) for sample in samples]
         N = len(nodes)
