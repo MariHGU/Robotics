@@ -76,7 +76,8 @@ class MotionPlanner:
             return np.inf
         
         # Angle from p1 to p2 in local frame
-        alpha = np.arctan2(p2[1] - p1[1], p2[0] - p1[0] - theta1) # ???
+        #alpha = np.arctan2(p2[1] - p1[1], p2[0] - p1[0] - theta1) # ???
+        alpha = np.arctan2(p2[1] - p1[1], p2[0] - p1[0]) - theta1
         alpha = np.arctan2(np.sin(alpha), np.cos(alpha))
 
         if abs(np.sin(alpha)) < 1e-6:
