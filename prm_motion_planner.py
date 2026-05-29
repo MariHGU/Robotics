@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import heapq
 
 class MotionPlanner:
-    def __init__(self, start, goal, obstacles: list , grid_size=10, obstacle_radius=0.5, robot_radius=0.3):
+    def __init__(self, start, goal, obstacles: list , grid_size=10, obstacle_radius=0.5, robot_radius=0.3, wheelbase=0.5, max_steer_deg=35):
         self.start = np.array(start) # x, y, theta
         self.goal = np.array(goal) # x, y, theta
         self.obstacles = obstacles 
@@ -15,6 +15,11 @@ class MotionPlanner:
         margin = robot_radius + obstacle_radius
         self.x_min, self.x_max = -grid_size/2 + margin, grid_size/2 - margin
         self.y_min, self.y_max = -grid_size/2 + margin, grid_size/2 - margin
+
+        # Car-like param:
+        self.wheelbase = wheelbase
+        self.max_steer = np.radians(max_steer_deg)
+        self.min_turn_radius = wheelbase/np.tan(self.max_steer)
 
 
     def sample_random_points(self, num_points):
@@ -29,13 +34,8 @@ class MotionPlanner:
                 points.append((x, y))
         return points
 
-    def line_is_free(self, p1, p2, num_checks=20):
-        q1 = np.array(p1[:2], dtype=float)
-        q2 = np.array(p2[:2], dtype=float)
-
-        for k in range(num_checks + 1):
-            t = k / num_checks
-            point = q1 + t * (q2 - q1) # Linear interpolation point
+    def path_is_free(self, path):
+        for point in path:
             if self.is_collision(point):
                 return False
         return True
@@ -70,15 +70,36 @@ class MotionPlanner:
 
         return False
     
-    # def simple_planner(self, start, goal, num_steps=20):
-    #     # straigt line planner (p. 384/404)
-    #     # Returns waypoints ignoring obstacles
-    #     start, goal = np.array(start[:2], dtype=float), np.array(goal[:2], dtype=float)
-    #     #num_steps = 20
-    #     for t in range(num_steps + 1):
-    #         path = start + (goal - start) * t / num_steps
-    #     #path = [start + (goal - start) * t / num_steps for t in range(num_steps + 1)]
-    #     return path
+    def requried_radius(self, p1, p2, theta1):
+        d = np.linalg.norm(p2 - p1)
+        if d < 1e-6:
+            return np.inf
+        
+        # Angle from p1 to p2 in local frame
+        alpha = np.arctan2(p2[1] - p1[1], p2[0] - p1[0] - theta1) # ???
+        alpha = np.arctan2(np.sin(alpha), np.cos(alpha))
+
+        if abs(np.sin(alpha)) < 1e-6:
+            return np.inf
+        
+        return abs(d / (2 * np.sin(alpha)))
+    
+    def local_planner(self, start, goal, num_steps=20):
+        start, goal = np.array(start[:2], dtype=float), np.array(goal[:2], dtype=float)
+
+        seg = goal - start
+        theta = np.arctan2(seg[1], seg[0])
+
+        rad = self.requried_radius(start, goal, theta)
+        if rad < self.min_turn_radius:
+            return []
+
+        path = []
+        for k in range(num_steps + 1):
+            t = k/num_steps
+            point = start + (goal-start)*t
+            path.append(point)
+        return path
     
     def aStarSearch(self, start, edges, nodes, goal):
         """Search the node that has the lowest combined cost and heuristic first."""
@@ -153,27 +174,30 @@ class MotionPlanner:
 
             for j in neighbours:
                 qj = nodes[j]
-                if self.line_is_free(qi, qj):
+
+                local_path = self.local_planner(qi, qj, num_steps=20)
+                if self.path_is_free(local_path):
                     edges.setdefault(i, []).append(j)
                     edges.setdefault(j, []).append(i)
         return nodes, edges
     
-    def prm(self, N=100, k=5):
+    def global_planner(self, N=100, k=5):
         nodes, edges = self.prm_roadmap(N, k)
 
         start_idx = len(nodes) - 2
         goal_idx = len(nodes) - 1
 
         # A* search on roadmap
-
-        # add astar here
         path_indicies = self.aStarSearch(start_idx, edges, nodes, goal_idx)
 
-        if path_indicies is None:
+        if not path_indicies:
             print("No path found")
             return []
         
         path = [nodes[i] for i in path_indicies]
+        path.pop()
+        goal_pose = np.array([self.goal[0], self.goal[1], self.goal[2]], dtype=float)
+        path.append(goal_pose)
         return path
 
 

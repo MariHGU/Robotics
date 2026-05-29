@@ -2,15 +2,26 @@ import numpy as np
 import math
 
 class Controller:
-    def __init__(self, K1, K2, K3):
+    def __init__(self, K1, K2, K3, wheelbase, max_steer_deg):
         self.K1 = K1
         self.K2 = K2
         self.K3 = K3
         self.integral_error = 0.0
         self.previous_error = 0.0
 
+        # Car-like
+        self.wheelbase = wheelbase
+        self.max_steer = np.radians(max_steer_deg)
+
+
     def wrap_to_pi(self, a):
         return np.arctan2(np.sin(a), np.cos(a))
+    
+    def to_steering_angle(self, v, omega):
+        if abs(v) < 1e-6:
+            return 0.0
+        delta = np.arctan2(omega * self.wheelbase, v)
+        return float(np.clip(delta, -self.max_steer, self.max_steer))
 
     def error_coordinates(self, q, q_d):
         dphi = q[2]-q_d[2]
@@ -33,91 +44,16 @@ class Controller:
 
 
     # Non lin FB controller + fb control law:
-    # def non_lin_fb_controller(self, q, q_d, v_d, w_d):
-    #     # Compute the control signals for the linear and angular velocities
-    #     x_e, y_e, phi_e = self.error_coordinates(q, q_d)
-
-    #     if abs(phi_e) > np.pi / 3:
-    #         v = 0.0
-    #         w = -2.0 * phi_e
-    #         return v, w
-
-    #     #v = (v_d - self.Kp*np.abs(v_d)*(x_e+y_e*math.tan(phi_e)))/math.cos(phi_e)
-    #     v = v_d - self.K1 * abs(v_d) * (x_e + y_e * np.tan(phi_e)) / np.cos(phi_e)
-    #     w = w_d - (self.K2*v_d*y_e + self.K3*np.abs(v_d)*math.tan(phi_e))*(math.cos(phi_e))**2
-
-    #     return v, w
-    
-    # def non_lin_fb_controller(self, q, q_d, v_d, w_d):
-    #     x_e, y_e, phi_e = self.error_coordinates(q, q_d)
-
-    #     # Softer heading correction — don't zero out v entirely
-    #     if abs(phi_e) >= np.pi / 2:
-    #         # Pure rotation to align heading, with a small creep forward
-    #         v = 0.0
-    #         w = -self.K3 * phi_e  # proportional, not hardcoded gain
-    #         return v, w
-
-    #     cos_phi = np.cos(phi_e)
-    #     tan_phi = np.tan(phi_e)
-
-    #     # Eq 13.31 from Modern Robotics
-    #     v = (v_d - self.K1 * abs(v_d) * (x_e + y_e * tan_phi)) / cos_phi
-    #     w = w_d - (self.K2 * v_d * y_e + self.K3 * abs(v_d) * tan_phi) * (cos_phi ** 2)
-
-    #     # Clamp to prevent runaway near phi_e → ±π/2
-    #     v = np.clip(v, -1.5, 1.5)
-    #     w = np.clip(w, -3.0, 3.0)
-
-    #     return v, w
-
-    # def non_lin_fb_controller(self, q, q_d, v_d, w_d):
-    #     x_e, y_e, phi_e = self.error_coordinates(q, q_d)
-
-    #     # If heading error is too large, spin in place to align first
-    #     # Use a threshold well below π/2 to avoid the singularity
-    #     HEADING_THRESHOLD = np.pi / 4  # 45 degrees
-
-    #     if abs(phi_e) > HEADING_THRESHOLD:
-    #         v = 0.0
-    #         # Spin proportionally but cap it
-    #         w = np.clip(-self.K3 * phi_e, -2.0, 2.0)
-    #         return v, w
-
-    #     # Normal operation: phi_e is small enough that cos(phi_e) is safe
-    #     cos_phi = np.cos(phi_e)
-    #     tan_phi = np.tan(phi_e)
-
-    #     v = (v_d - self.K1 * abs(v_d) * (x_e + y_e * tan_phi)) / cos_phi
-    #     w = w_d - (self.K2 * v_d * y_e + self.K3 * abs(v_d) * tan_phi) * (cos_phi ** 2)
-
-    #     v = np.clip(v, -1.5, 1.5)
-    #     w = np.clip(w, -3.0, 3.0)
-
-    #     return v, w
-
-# Works with this, however wrong version
-    # def non_lin_fb_controller(self, q, q_d, v_d, w_d):
-    #     dx = q_d[0] - q[0]
-    #     dy = q_d[1] - q[1]
-
-    #     desired_heading = np.arctan2(dy, dx)
-    #     heading_error = self.wrap_to_pi(desired_heading - q[2])
-
-    #     distance = np.hypot(dx, dy)
-
-    #     v = self.K1 * distance * max(0.0, np.cos(heading_error))
-    #     w = self.K3 * heading_error
-
-    #     v = np.clip(v, 0.0, 0.8)
-    #     w = np.clip(w, -2.5, 2.5)
-
-    #     return v, w
-    
     def non_lin_fb_controller(self, q, q_d, v_d, w_d):
         x_e, y_e, phi_e = self.error_coordinates(q, q_d)
 
         distance = np.hypot(q[0] - q_d[0], q[1] - q_d[1])
+
+        # Rotation to alighn with goal heading:
+        if v_d == 0.0 and distance < 0.3:
+            v = 0.0
+            w = np.clip(-self.K3 * phi_e, -2.5, 2.5)
+            return v, w
 
             # If reference has stopped but robot is far away, use go-to-goal fallback
         if v_d == 0.0 and distance > 0.3:
@@ -143,9 +79,17 @@ class Controller:
 
         turn_penalty = np.cos(phi_e)**2
         v *= turn_penalty
-        
+
         v = np.clip(v, -1.0, 1.0)
         w = np.clip(w, -2.5, 2.5)
 
         return v, w
+    
+    def car_controller(self, q, q_d, v_d, w_d):
+        v, omega = self.non_lin_fb_controller(q, q_d, v_d, w_d)
+
+        v = np.clip(v, 0.0, 1.0) # No reverse for now, planner does not account for it
+
+        delta = self.to_steering_angle(v, omega)
+        return v, delta
 
