@@ -19,7 +19,7 @@
     </visual>
     <collision>
       <geometry>
-        <box size="0.5 0.2 0.1"/>
+        <box size="0.5 0.3 0.1"/>
       </geometry>
     </collision>
   </link>
@@ -30,77 +30,86 @@
     <origin xyz="0 0 0.1" rpy="0 0 0"/>
   </joint>
 
-  <!-- Rear wheel: placed at back of body, rotated so cylinder axis = Y -->
-  <link name="rear_wheel">
-    <inertial>
-      <mass value="0.1"/>
-      <origin xyz="0 0 0"/>
-      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
-    </inertial>
-    <visual>
-      <geometry>
-        <cylinder radius="0.1" length="0.05"/>
-      </geometry>
-      <material name="black"><color rgba="0 0 0 1"/></material>
-    </visual>
-    <collision>
-      <geometry>
-        <cylinder radius="0.1" length="0.05"/>
-      </geometry>
-    </collision>
-  </link>
 
-  <!-- rpy="1.5708 0 0" rotates cylinder to lie on Y axis; xyz puts it at rear -->
-  <joint name="rear_wheel_joint" type="continuous">
-    <parent link="base_link"/>
-    <child link="rear_wheel"/>
-    <origin xyz="-0.25 0 -0.05" rpy="1.5708 0 0"/>
-    <axis xyz="0 0 1"/>
-  </joint>
-
-  <!-- Steering link: no geometry, positioned at front of body -->
-  <link name="steering_link">
-    <inertial>
-      <mass value="0.05"/>
-      <origin xyz="0 0 0"/>
-      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
-    </inertial>
-  </link>
-
-  <joint name="steering_joint" type="revolute">
-    <parent link="base_link"/>
-    <child link="steering_link"/>
-    <origin xyz="0.25 0 -0.05" rpy="0 0 0"/>
-    <axis xyz="0 0 1"/>
-    <limit lower="-0.6109" upper="0.6109" effort="10" velocity="1.0"/>
-  </joint>
-
-  <!-- Front wheel: parented to steering_link, same rotation trick as rear -->
-  <link name="front_wheel">
-    <inertial>
-      <mass value="0.1"/>
-      <origin xyz="0 0 0"/>
-      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
-    </inertial>
-    <visual>
-      <geometry>
-        <cylinder radius="0.1" length="0.05"/>
-      </geometry>
-      <material name="black"><color rgba="0 0 0 1"/></material>
-    </visual>
-    <collision>
-      <geometry>
-        <cylinder radius="0.1" length="0.05"/>
-      </geometry>
-    </collision>
-  </link>
-
-  <!-- xyz="0 0 0" is correct here: steering_link is already at the front -->
-  <joint name="front_wheel_joint" type="continuous">
-    <parent link="steering_link"/>
-    <child link="front_wheel"/>
+<!-- Rear left wheel -->
+<link name="rear_left_wheel">
+  <visual>
     <origin xyz="0 0 0" rpy="1.5708 0 0"/>
-    <axis xyz="0 0 1"/>
-  </joint>
+    <geometry><cylinder radius="0.1" length="0.05"/></geometry>
+    <material name="black"><color rgba="0 0 0 1"/></material>
+  </visual>
+</link>
 
+<joint name="rear_left_wheel_joint" type="fixed">
+  <parent link="base_link"/>
+  <child link="rear_left_wheel"/>
+  <origin xyz="-0.20 0.15 -0.05"/>
+</joint>
+
+<!-- Rear right wheel -->
+<link name="rear_right_wheel">
+  <visual>
+    <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+    <geometry><cylinder radius="0.1" length="0.05"/></geometry>
+    <material name="black"><color rgba="0 0 0 1"/></material>
+  </visual>
+</link>
+
+<joint name="rear_right_wheel_joint" type="fixed">
+  <parent link="base_link"/>
+  <child link="rear_right_wheel"/>
+  <origin xyz="-0.20 -0.15 -0.05"/>
+</joint>
+
+<!-- Front left steering link -->
+<link name="front_left_steer"/>
+
+<joint name="front_left_steer_joint" type="revolute">
+  <parent link="base_link"/>
+  <child link="front_left_steer"/>
+  <origin xyz="0.20 0.15 -0.05"/>
+  <axis xyz="0 0 1"/>
+  <limit lower="-0.6109" upper="0.6109" effort="10" velocity="1"/>
+</joint>
+
+<!-- Front left wheel, fixed to steering link -->
+<link name="front_left_wheel">
+  <visual>
+    <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+    <geometry><cylinder radius="0.1" length="0.05"/></geometry>
+    <material name="black"><color rgba="0 0 0 1"/></material>
+  </visual>
+</link>
+
+<joint name="front_left_wheel_joint" type="fixed">
+  <parent link="front_left_steer"/>
+  <child link="front_left_wheel"/>
+  <origin xyz="0 0 0"/>
+</joint>
+
+<!-- Front right steering link -->
+<link name="front_right_steer"/>
+
+<joint name="front_right_steer_joint" type="revolute">
+  <parent link="base_link"/>
+  <child link="front_right_steer"/>
+  <origin xyz="0.20 -0.15 -0.05"/>
+  <axis xyz="0 0 1"/>
+  <limit lower="-0.6109" upper="0.6109" effort="10" velocity="1"/>
+</joint>
+
+<!-- Front right wheel, fixed to steering link -->
+<link name="front_right_wheel">
+  <visual>
+    <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+    <geometry><cylinder radius="0.1" length="0.05"/></geometry>
+    <material name="black"><color rgba="0 0 0 1"/></material>
+  </visual>
+</link>
+
+<joint name="front_right_wheel_joint" type="fixed">
+  <parent link="front_right_steer"/>
+  <child link="front_right_wheel"/>
+  <origin xyz="0 0 0"/>
+</joint>
 </robot>
