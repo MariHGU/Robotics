@@ -89,7 +89,7 @@ class Controller:
     def car_controller(self, q_est, q_d, v_d, w_d):
         v, omega = self.non_lin_fb_controller(q_est, q_d, v_d, w_d, car_like=True)
 
-        v = np.clip(v, 0.0, 1.0) # No reverse for now, planner does not account for it
+        v = np.clip(v, 0.0, 1.0) # Dubins car
 
         delta = self.to_steering_angle(v, omega)
         return v, delta

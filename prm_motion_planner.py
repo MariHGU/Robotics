@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import heapq
-from dubins_utils import dubins_path
 
 class MotionPlanner:
     def __init__(self, start, goal, obstacles: list , grid_size=10, obstacle_radius=0.5, robot_radius=0.3, wheelbase=0.5, max_steer_deg=35):
