@@ -34,17 +34,9 @@ class Controller:
         x_e = math.cos(q_d[2])*dx + math.sin(q_d[2])*dy
         y_e = -math.sin(q_d[2])*dx + math.cos(q_d[2])*dy
         return x_e, y_e, phi_e
-    
-    # Choose reference point P, not on axis of two driving wheels
-    # Desired trajectory: q_d(t)
-    # Reference point: P = (x_Pd(t), y_Pd(t))
-    
-    # [v, w]^T = J^-1 * [control_signal_x, control_signal_y]^T
-    # J^-1 = 1/x_r * [[x_r*cos(phi)-y_r*sin(phi), x_r*sin(phi)+y_r*cos(phi)], [-sin(phi), cos(phi)]]
-
 
     # Non lin FB controller + fb control law:
-    def non_lin_fb_controller(self, q_est, q_d, v_d, w_d):
+    def non_lin_fb_controller(self, q_est, q_d, v_d, w_d, car_like=False):
         x_e, y_e, phi_e = self.error_coordinates(q_est, q_d)
 
         distance = np.hypot(q_est[0] - q_d[0], q_est[1] - q_d[1])
@@ -52,6 +44,10 @@ class Controller:
         # Rotation to alighn with goal heading:
         if v_d == 0.0 and distance < 0.3:
             v = 0.0
+            if car_like:
+                v = 0.08
+                w = np.clip(-self.K3 * phi_e, -1.0, 1.0)
+                return v, w
             w = np.clip(-self.K3 * phi_e, -2.5, 2.5)
             return v, w
 
@@ -63,10 +59,15 @@ class Controller:
             w = self.K3 * heading_error
             return np.clip(v, 0.0, 1.0), np.clip(w, -2.5, 2.5)
 
-        # Guard against singularity at phi_e → +-pi/2 (book assumes |phi_e| < pi/2)
+        # Guard against singularity at phi_e -> +-pi/2
         if abs(phi_e) >= np.pi / 2:
             # Align heading first before attempting trajectory tracking
-            v = 0.0
+            if not car_like:
+                v = 0.0
+            else:
+                v = 0.15
+                delta = -np.sign(phi_e) * self.max_steer
+                return v, delta
             w = np.clip(-self.K3 * phi_e, -2.5, 2.5)
             return v, w
 
@@ -86,7 +87,7 @@ class Controller:
         return v, w
     
     def car_controller(self, q_est, q_d, v_d, w_d):
-        v, omega = self.non_lin_fb_controller(q_est, q_d, v_d, w_d)
+        v, omega = self.non_lin_fb_controller(q_est, q_d, v_d, w_d, car_like=True)
 
         v = np.clip(v, 0.0, 1.0) # No reverse for now, planner does not account for it
 
