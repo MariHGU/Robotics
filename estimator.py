@@ -2,8 +2,8 @@ import numpy as np
 
 class EKF:
     def __init__(self, x0, y0, theta0, model='diff-drive'):
-        self.model = model  # e.g. model='bicycle'
-        if self.model == 'bicycle':
+        self.model = model
+        if self.model == 'car_like':
             # x = [x, y, theta, delta]
             self.x = np.array([x0, y0, theta0, 0.0])   # start delta=0
             self.P = np.diag([1e-3, 1e-3, 1e-2, 1e-3])  # 4x4
@@ -34,7 +34,7 @@ class EKF:
                             [0, 1, 0]])
 
     def predict(self, u, w, dt, wheelbase=0.5, Q_control=None):
-        if self.model != 'bicycle':
+        if self.model != 'car_like':
             x, y, theta = self.x
         
             # propagate state using differential drive dynamics
