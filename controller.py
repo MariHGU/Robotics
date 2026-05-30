@@ -63,7 +63,7 @@ class Controller:
             w = self.K3 * heading_error
             return np.clip(v, 0.0, 1.0), np.clip(w, -2.5, 2.5)
 
-        # Guard against singularity at phi_e → ±π/2 (book assumes |phi_e| < π/2)
+        # Guard against singularity at phi_e → +-pi/2 (book assumes |phi_e| < pi/2)
         if abs(phi_e) >= np.pi / 2:
             # Align heading first before attempting trajectory tracking
             v = 0.0
