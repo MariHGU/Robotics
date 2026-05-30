@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import heapq
+from dubins_utils import dubins_path
 
 class MotionPlanner:
     def __init__(self, start, goal, obstacles: list , grid_size=10, obstacle_radius=0.5, robot_radius=0.3, wheelbase=0.5, max_steer_deg=35):
@@ -35,6 +36,8 @@ class MotionPlanner:
         return points
 
     def path_is_free(self, path):
+        if not path:
+            return False
         for point in path:
             if self.is_collision(point):
                 return False
@@ -76,7 +79,6 @@ class MotionPlanner:
             return np.inf
         
         # Angle from p1 to p2 in local frame
-        #alpha = np.arctan2(p2[1] - p1[1], p2[0] - p1[0] - theta1) # ???
         alpha = np.arctan2(p2[1] - p1[1], p2[0] - p1[0]) - theta1
         alpha = np.arctan2(np.sin(alpha), np.cos(alpha))
 
@@ -85,14 +87,14 @@ class MotionPlanner:
         
         return abs(d / (2 * np.sin(alpha)))
     
-    def local_planner(self, start, goal, num_steps=20):
+    def local_planner(self, start, goal, num_steps=30):
         start, goal = np.array(start[:2], dtype=float), np.array(goal[:2], dtype=float)
 
         seg = goal - start
         theta = np.arctan2(seg[1], seg[0])
 
         rad = self.requried_radius(start, goal, theta)
-        if rad < self.min_turn_radius:
+        if rad != np.inf and rad < self.min_turn_radius:
             return []
 
         path = []
@@ -177,7 +179,10 @@ class MotionPlanner:
             for j in neighbours:
                 qj = nodes[j]
 
-                local_path = self.local_planner(qi, qj, num_steps=20)
+                dist = np.linalg.norm(np.array(qi) - np.array(qj))
+                num_steps = max(20, int(dist / (self.robot_radius * 0.5)))
+
+                local_path = self.local_planner(qi, qj, num_steps=num_steps)
                 if self.path_is_free(local_path):
                     edges.setdefault(i, []).append(j)
                     edges.setdefault(j, []).append(i)
